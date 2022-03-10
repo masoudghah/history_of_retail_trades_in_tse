@@ -1,0 +1,171 @@
+{% extends 'base.html' %}
+{% block content %}
+{% load humanize %}
+
+
+<div class="container">
+    <div class="row">
+      <div class="col-sm">
+<!--form-->
+<div class="input-group mb-3">
+  <form action="" method="post" style="margin-right: 0px;margin-top: 50px;">{% csrf_token %}
+      <div class="input-group mb-3">
+          <div class="input-group-prepend">
+            <span class="input-group-text"  >انتخاب سهم</span>
+          </div>
+          <input name='symbol_input' value="{{ symbol_input }}" id='symbol_input_id' type="search" class="form-control" required>
+      </div>
+
+    <script>
+      $( function() {
+        var instrumentSymbol = [
+            {% for instrument in instruments %}
+                "{{instrument.ticker}}",
+            {% endfor %}
+        ];
+        $( "#symbol_input_id" ).autocomplete({
+          source: instrumentSymbol
+        });
+      } );
+
+    </script>
+
+
+      <div class="input-group mb-3">
+          <div class="input-group-prepend">
+            <span class="input-group-text"  >از تاریخ</span>
+          </div>
+          <input name="start_date_input" type="text" class="form-control" value="{{start_date_input}}">
+      </div>
+
+      <div class="input-group mb-3">
+          <div class="input-group-prepend">
+            <span class="input-group-text"  >تا تاریخ</span>
+          </div>
+          <input name="end_date_input" type="text" class="form-control" value="{{end_date_input}}">
+      </div>
+
+      <button type="submit" class="btn btn-success" style="margin-right: 400px;">ارسال</button>
+
+  </form>
+  </div>
+</div>
+      <div class="col-sm">
+<!--chart-->
+  <div style="margin-top: 20px; margin-bottom: 20px;">
+    <canvas id="chart" width="300" height="160"></canvas>
+  </div>
+        </div>
+    </div>
+  </div>
+
+
+<!-- Table-->
+<div >
+<table class='table' style="margin-right: 10px; margin-left: 10px;font-size:90%">
+    <tr>
+        <th style='background-color: #d4d4d4;' colspan='12'>
+            برآیند ورود و خروج پول در این بازه
+            <span style="direction: ltr;unicode-bidi: bidi-override;color:blue;"> {{incoming_and_outgoing_differences | intcomma}}</span>
+            میلیارد تومان می‌باشد
+            .
+
+        </th>
+
+    </tr>
+    <tr>
+        <th style='background-color: #d4d4d4;'>تاریخ</th>
+        <th style='background-color: #d4d4d4;'>روز هفته</th>
+        <th style='background-color: #d4d4d4;'>برآیند حجم خرید حقیقی</th>
+        <th style='background-color: #d4d4d4;'>قیمت پایانی</th>
+        <th style='background-color: #d4d4d4;'>برآیند ارزش خرید حقیقی (تومان)</th>
+    </tr>
+
+    {% for record in table_data %}
+    <tr>
+        <td >{{record.JalaliDate}}</td>
+        <td >{{record.Weekday}}</td>
+        <td ><span style="direction: ltr;unicode-bidi: bidi-override;"> {{record.all_buy_R_volume | intcomma}}</span></td>
+        <td >{{record.Final}}</td>
+        {% if record.all_buy_R_value > 0 %}
+        <td ><span style="color: green; direction: ltr;unicode-bidi: bidi-override;"> {{record.all_buy_R_value  | intcomma}}</span></td>
+        {% else %}
+        <td ><span style="color: red; direction: ltr;unicode-bidi: bidi-override;"> {{record.all_buy_R_value  | intcomma}}</span></td>
+        {% endif %}
+    </tr>
+    {% endfor %}
+
+</table>
+</div>
+
+
+<!--javascript code-->
+{% load static %}
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.js">  </script>
+<script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/jquery-ui.js">  </script>
+<link href= "http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/themes/ui-lightness/jquery-ui.css" rel="stylesheet" type="text/css" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.3/dist/Chart.min.js"></script>
+<script>
+
+// chart
+var x_labels = {{chart_data_date | safe }};
+var backgroundColor = [];
+var borderColor = [];
+var chartColors = {
+  red: 'rgba(255, 66, 66, 0.5)',
+  green: 'rgba(75, 250, 81, 0.4)',
+  blue: 'rgb(0, 94, 138)',};
+
+for (var i = 1; i <= x_labels.length; i++) {
+    backgroundColor.push(chartColors.green);
+    borderColor.push('rgba(0, 0, 0, 0.4)');
+};
+
+const ctx = document.getElementById('chart').getContext('2d');
+const myChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+        labels: x_labels,
+        datasets: [{
+            label: 'ورود و خروج پول حقیقی',
+            data: {{chart_data_values | safe}},
+            backgroundColor: backgroundColor,
+            borderColor: borderColor,
+            borderWidth: 1,
+            yAxisID: 'first-y-axis',
+        }, {
+           label: ' قیمت پایانی (تعدیل‌شده)',
+           data: {{chart_data_close_price | safe}},
+           type: 'line',
+           borderColor: chartColors.blue,
+           yAxisID: 'second-y-axis'
+
+       }]
+    },
+    options: {
+        scales: {
+            yAxes: [{
+                id: 'first-y-axis',
+                type: 'linear'
+                }, {
+                id: 'second-y-axis',
+                type: 'linear'
+                }]
+        }
+    }
+});
+
+var colorChangeValue = 1;
+var dataset = myChart.data.datasets[0];
+
+for (var i = 0; i < dataset.data.length; i++) {
+  if (dataset.data[i] < colorChangeValue) {
+    dataset.backgroundColor[i] = chartColors.red;
+
+  }
+}
+myChart.update();
+
+</script>
+
+{% endblock content %}
